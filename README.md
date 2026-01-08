@@ -9,7 +9,10 @@ En containeriseret microservice til at tage screenshots af websites med forskell
 - 🎨 Understøtter PNG og JPEG formater
 - ⚙️ JPEG kvalitetskontrol (0-100)
 - 📄 Vælg mellem viewport eller full-page screenshots
-- 🐳 Fuldt dockeriseret med Docker Compose
+- � Auto-scroll gennem siden for at trigge scroll-baserede animationer
+- ⏸️ Kontrollerbar delay for animationer og dynamisk indhold
+- ⚡ Disable CSS animationer for konsistente screenshots
+- �🐳 Fuldt dockeriseret med Docker Compose
 - 🔄 Base64-kodet output via JSON API
 - ⏱️ 30 sekunders timeout med network idle wait strategy
 
@@ -51,9 +54,14 @@ Vis tilgængelige skærmstørrelser og indstillinger
   "formats": ["png", "jpeg"],
   "defaultFormat": "png",
   "defaultQuality": 80,
+  "defaultDelay": "2000 millisekunder",
+  "autoScroll": true,
   "timeout": "30 sekunder",
   "options": {
-    "fullPage": "boolean - Tag screenshot af hele siden (default: false)"
+    "fullPage": "boolean - Tag screenshot af hele siden (default: false)",
+    "delay": "number - Ekstra ventetid i ms efter side load (default: 2000)",
+    "disableAnimations": "boolean - Disable CSS animationer (default: true)",
+    "autoScroll": "boolean - Auto-scroll for at trigge scroll-animationer (default: true)"
   }
 }
 ```
@@ -68,7 +76,10 @@ Tag screenshot af en URL
   "screenSize": "desktop",
   "format": "png",
   "quality": 80,
-  "fullPage": false
+  "fullPage": false,
+  "delay": 2000,
+  "disableAnimations": true,
+  "autoScroll": true
 }
 ```
 
@@ -78,6 +89,9 @@ Tag screenshot af en URL
 - `format` (optional): Billedformat - "png" eller "jpeg" (default: "png")
 - `quality` (optional): JPEG kvalitet 0-100 (default: 80, kun for JPEG)
 - `fullPage` (optional): Tag screenshot af hele siden (default: false)
+- `delay` (optional): Ekstra ventetid i millisekunder efter side load (default: 2000, max: 30000)
+- `disableAnimations` (optional): Disable CSS animationer og transitions (default: true)
+- `autoScroll` (optional): Auto-scroll gennem siden for at trigge scroll-baserede animationer (default: true)
 
 **Success Response (200):**
 ```json
@@ -92,6 +106,9 @@ Tag screenshot af en URL
       "height": 1080
     },
     "fullPage": false,
+    "delay": 2000,
+    "disableAnimations": true,
+    "autoScroll": true,
     "url": "https://example.com",
     "timestamp": "2026-01-08T10:30:00.000Z"
   }
@@ -167,6 +184,18 @@ curl -X POST http://localhost:3000/screenshot \
   -d '{"url": "https://example.com", "screenSize": "laptop", "fullPage": true}'
 ```
 
+### cURL eksempel (Med scroll-animationer og custom delay)
+```bash
+curl -X POST http://localhost:3000/screenshot \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "screenSize": "desktop", "autoScroll": true, "delay": 3000, "disableAnimations": false}'
+```
+```bash
+curl -X POST http://localhost:3000/screenshot \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "screenSize": "laptop", "fullPage": true}'
+```
+
 ### JavaScript (fetch) eksempel
 ```javascript
 const response = await fetch('http://localhost:3000/screenshot', {
@@ -178,7 +207,10 @@ const response = await fetch('http://localhost:3000/screenshot', {
     url: 'https://example.com',
     screenSize: 'tablet',
     format: 'png',
-    fullPage: false
+    fullPage: false,
+    delay: 2000,
+    disableAnimations: true,
+    autoScroll: true
   })
 });
 
@@ -201,7 +233,10 @@ response = requests.post('http://localhost:3000/screenshot', json={
     'url': 'https://example.com',
     'screenSize': 'desktop',
     'format': 'png',
-    'fullPage': False
+    'fullPage': False,
+    'delay': 2000,
+    'disableAnimations': True,
+    'autoScroll': True
 })
 
 data = response.json()
@@ -235,10 +270,45 @@ ports:
 
 Servicen returnerer følgende fejltyper:
 
-- **400 Bad Request**: Ugyldig parameter (manglende URL, ugyldig screenSize, ugyldigt format, etc.)
+- **400 Bad Request**: Ugyldig parameter (manglende URL, ugyldig screenSize, ugyldigt format, ugyldig delay, etc.)
 - **500 Internal Server Error**: Screenshot fejlede (timeout, connection refused, etc.)
 
 Fejlbeskeder er på dansk og giver detaljerede beskrivelser af problemet.
+
+## Use Cases
+
+### Websites med scroll-baserede animationer
+```json
+{
+  "url": "https://example.com",
+  "autoScroll": true,
+  "disableAnimations": true,
+  "delay": 2000
+}
+```
+Auto-scroller gennem siden for at trigge alle animationer, disabler dem derefter for konsistent output.
+
+### Hurtig viewport screenshot
+```json
+{
+  "url": "https://example.com",
+  "autoScroll": false,
+  "delay": 0
+}
+```
+Hurtigst muligt screenshot af viewport uden scroll eller delay.
+
+### Full-page screenshot med alle animationer synlige
+```json
+{
+  "url": "https://example.com",
+  "fullPage": true,
+  "autoScroll": true,
+  "disableAnimations": false,
+  "delay": 5000
+}
+```
+Lader animationer køre i 5 sekunder og fanger dem i deres animerede tilstand.
 
 ## Teknologi Stack
 
