@@ -9,7 +9,7 @@ const SCREEN_SIZES = {
 
 // Default konfiguration
 const DEFAULT_CONFIG = {
-  timeout: 30000, // 30 sekunder
+  timeout: 60000, // 60 sekunder
   defaultFormat: 'png',
   defaultQuality: 80,
   defaultDelay: 2000, // 2 sekunder ekstra ventetid
