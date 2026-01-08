@@ -1,0 +1,25 @@
+{
+  "name": "microservice-screenshot",
+  "version": "1.0.0",
+  "description": "Microservice for capturing website screenshots with various screen sizes",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "keywords": [
+    "screenshot",
+    "microservice",
+    "puppeteer",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^21.6.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

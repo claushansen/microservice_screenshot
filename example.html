@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenshot Service - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .result h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .screenshot-container {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screenshot-container img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            margin-bottom: 15px;
+        }
+
+        .screenshot-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            text-align: left;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .screenshot-info div {
+            margin-bottom: 5px;
+        }
+
+        .screenshot-info strong {
+            color: #333;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #c33;
+        }
+
+        .loading {
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-btn {
+            background: #28a745;
+            margin-top: 10px;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        @media (max-width: 600px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Screenshot Service</h1>
+        <p class="subtitle">Tag screenshots af websites med forskellige skærmstørrelser</p>
+
+        <form id="screenshotForm">
+            <div class="form-group">
+                <label for="url">Website URL *</label>
+                <input type="text" id="url" placeholder="https://example.com" required>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="screenSize">Skærmstørrelse</label>
+                    <select id="screenSize">
+                        <option value="desktop">Desktop (1920x1080)</option>
+                        <option value="laptop">Laptop (1366x768)</option>
+                        <option value="tablet">Tablet (768x1024)</option>
+                        <option value="mobile">Mobile (375x667)</option>
+                        <option value="mobile-large">Mobile Large (414x896)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="format">Format</label>
+                    <select id="format">
+                        <option value="png">PNG</option>
+                        <option value="jpeg">JPEG</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="quality">JPEG Kvalitet (0-100)</label>
+                <input type="number" id="quality" min="0" max="100" value="80">
+            </div>
+
+            <div class="form-group">
+                <label for="delay">Ekstra ventetid i millisekunder (0-30000)</label>
+                <input type="number" id="delay" min="0" max="30000" value="2000">
+                <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">Giver animationer og dynamisk indhold tid til at rendere</small>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="disableAnimations" checked>
+                    <label for="disableAnimations" style="margin-bottom: 0;">Disable CSS animationer</label>
+                </div>
+                <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px; margin-left: 30px;">Stop animationer for mere konsistente screenshots</small>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="autoScroll" checked>
+                    <label for="autoScroll" style="margin-bottom: 0;">Auto-scroll gennem siden</label>
+                </div>
+                <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px; margin-left: 30px;">Scroller automatisk for at trigge scroll-baserede animationer</small>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="fullPage">
+                    <label for="fullPage" style="margin-bottom: 0;">Tag screenshot af hele siden</label>
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">Tag Screenshot</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <h2>Resultat</h2>
+            <div id="resultContent" class="screenshot-container"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('screenshotForm');
+        const resultDiv = document.getElementById('result');
+        const resultContent = document.getElementById('resultContent');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // API endpoint - ændr dette hvis din service kører på en anden port
+        const API_URL = 'http://localhost:3000/screenshot';
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Hent form values
+            const url = document.getElementById('url').value;
+            const screenSize = document.getElementById('screenSize').value;
+            const format = document.getElementById('format').value;
+            const quality = parseInt(document.getElementById('quality').value);
+            const fullPage = document.getElementById('fullPage').checked;
+            const delay = parseInt(document.getElementById('delay').value);
+            const disableAnimations = document.getElementById('disableAnimations').checked;
+            const autoScroll = document.getElementById('autoScroll').checked;
+
+            // Vis loading state
+            resultDiv.style.display = 'block';
+            resultContent.innerHTML = '<div class="spinner"></div><p class="loading">Tager screenshot...</p>';
+            submitBtn.disabled = true;
+
+            try {
+                // Send request
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url,
+                        screenSize,
+                        format,
+                        quality,
+                        fullPage,
+                        delay,
+                        disableAnimations,
+                        autoScroll
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Vis screenshot
+                    const img = document.createElement('img');
+                    img.src = `data:image/${data.data.format};base64,${data.data.screenshot}`;
+                    img.alt = 'Screenshot';
+
+                    const info = document.createElement('div');
+                    info.className = 'screenshot-info';
+                    info.innerHTML = `
+                        <div><strong>URL:</strong> ${data.data.url}</div>
+                        <div><strong>Skærmstørrelse:</strong> ${data.data.screenSize} (${data.data.dimensions.width}x${data.data.dimensions.height})</div>
+                        <div><strong>Format:</strong> ${data.data.format.toUpperCase()}</div>
+                        <div><strong>Hele siden:</strong> ${data.data.fullPage ? 'Ja' : 'Nej'}</div>
+                        <div><strong>Ventetid:</strong> ${data.data.delay}ms</div>
+                        <div><strong>Auto-scroll:</strong> ${data.data.autoScroll ? 'Ja' : 'Nej'}</div>
+                        <div><strong>Animationer disabled:</strong> ${data.data.disableAnimations ? 'Ja' : 'Nej'}</div>
+                        <div><strong>Tidspunkt:</strong> ${new Date(data.data.timestamp).toLocaleString('da-DK')}</div>
+                    `;
+
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'download-btn';
+                    downloadBtn.textContent = '⬇️ Download Screenshot';
+                    downloadBtn.onclick = () => {
+                        const link = document.createElement('a');
+                        link.href = `data:image/${data.data.format};base64,${data.data.screenshot}`;
+                        link.download = `screenshot-${data.data.screenSize}-${Date.now()}.${data.data.format}`;
+                        link.click();
+                    };
+
+                    resultContent.innerHTML = '';
+                    resultContent.appendChild(img);
+                    resultContent.appendChild(info);
+                    resultContent.appendChild(downloadBtn);
+                } else {
+                    // Vis fejl
+                    resultContent.innerHTML = `
+                        <div class="error">
+                            <strong>Fejl:</strong> ${data.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                // Network eller anden fejl
+                resultContent.innerHTML = `
+                    <div class="error">
+                        <strong>Forbindelsesfejl:</strong> Kunne ikke oprette forbindelse til screenshot service. 
+                        Sørg for at servicen kører på ${API_URL}
+                        <br><br>
+                        <strong>Fejlbesked:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Skjul/vis kvalitet baseret på format
+        document.getElementById('format').addEventListener('change', (e) => {
+            const qualityGroup = document.getElementById('quality').closest('.form-group');
+            if (e.target.value === 'jpeg') {
+                qualityGroup.style.display = 'block';
+            } else {
+                qualityGroup.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
