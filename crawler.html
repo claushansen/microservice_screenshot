@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Crawler - Screenshot Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #11998e;
+            border-bottom-color: #11998e;
+        }
+
+        .tab:hover {
+            color: #11998e;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #11998e;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"],
+        input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(17, 153, 142, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .result h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .progress {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            height: 100%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .screenshot-item {
+            background: #f5f5f5;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .screenshot-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .screenshot-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .screenshot-info {
+            padding: 10px;
+        }
+
+        .screenshot-url {
+            font-size: 0.75em;
+            color: #666;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #c33;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3c3;
+        }
+
+        .loading {
+            color: #11998e;
+            font-size: 1.1em;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #11998e;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .download-btn {
+            background: #11998e;
+            flex: 1;
+        }
+
+        .download-btn:hover {
+            background: #0e8077;
+        }
+
+        small {
+            color: #666;
+            font-size: 0.85em;
+            display: block;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 600px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .screenshots-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🕷️ Website Crawler</h1>
+        <p class="subtitle">Crawler en hel website og tag screenshots af alle sider</p>
+
+        <form id="crawlerForm">
+            <div class="form-group">
+                <label for="url">Start URL *</label>
+                <input type="text" id="url" placeholder="https://example.com" required>
+                <small>Crawler vil kun finde sider på samme domain</small>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="maxPages">Maksimalt antal sider</label>
+                    <input type="number" id="maxPages" min="1" max="100" value="10">
+                    <small>Max 100 sider per crawl</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="screenSize">Skærmstørrelse</label>
+                    <select id="screenSize">
+                        <option value="desktop">Desktop (1920x1080)</option>
+                        <option value="laptop">Laptop (1366x768)</option>
+                        <option value="tablet">Tablet (768x1024)</option>
+                        <option value="mobile">Mobile (375x667)</option>
+                        <option value="mobile-large">Mobile Large (414x896)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="format">Format</label>
+                    <select id="format">
+                        <option value="png">PNG</option>
+                        <option value="jpeg">JPEG</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="quality">JPEG Kvalitet (0-100)</label>
+                    <input type="number" id="quality" min="0" max="100" value="80">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="delay">Ventetid per side (millisekunder)</label>
+                <input type="number" id="delay" min="0" max="30000" value="2000">
+                <small>Ekstra tid til at lade animationer rendere</small>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="fullPage">
+                    <label for="fullPage" style="margin-bottom: 0;">Tag screenshot af hele siden</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="disableAnimations" checked>
+                    <label for="disableAnimations" style="margin-bottom: 0;">Disable CSS animationer</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="autoScroll" checked>
+                    <label for="autoScroll" style="margin-bottom: 0;">Auto-scroll gennem siden</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Output format</label>
+                <div class="checkbox-group">
+                    <input type="radio" id="outputJson" name="outputFormat" value="json" checked>
+                    <label for="outputJson" style="margin-bottom: 0;">JSON (vis i browser)</label>
+                </div>
+                <div class="checkbox-group" style="margin-top: 10px;">
+                    <input type="radio" id="outputZip" name="outputFormat" value="zip">
+                    <label for="outputZip" style="margin-bottom: 0;">ZIP fil (download)</label>
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">Start Crawler</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <h2>Resultat</h2>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('crawlerForm');
+        const resultDiv = document.getElementById('result');
+        const resultContent = document.getElementById('resultContent');
+        const submitBtn = document.getElementById('submitBtn');
+
+        const API_URL = 'http://localhost:3000/screenshot/crawl';
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const url = document.getElementById('url').value;
+            const maxPages = parseInt(document.getElementById('maxPages').value);
+            const screenSize = document.getElementById('screenSize').value;
+            const format = document.getElementById('format').value;
+            const quality = parseInt(document.getElementById('quality').value);
+            const delay = parseInt(document.getElementById('delay').value);
+            const fullPage = document.getElementById('fullPage').checked;
+            const disableAnimations = document.getElementById('disableAnimations').checked;
+            const autoScroll = document.getElementById('autoScroll').checked;
+            const outputFormat = document.querySelector('input[name="outputFormat"]:checked').value;
+
+            resultDiv.style.display = 'block';
+            resultContent.innerHTML = '<div class="spinner"></div><p class="loading">Crawler website og tager screenshots...</p>';
+            submitBtn.disabled = true;
+
+            try {
+                if (outputFormat === 'zip') {
+                    // Download som ZIP
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            url,
+                            maxPages,
+                            screenSize,
+                            format,
+                            quality,
+                            delay,
+                            fullPage,
+                            disableAnimations,
+                            autoScroll,
+                            outputFormat: 'zip'
+                        })
+                    });
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const downloadUrl = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = downloadUrl;
+                        a.download = `screenshots-${Date.now()}.zip`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(downloadUrl);
+
+                        resultContent.innerHTML = `
+                            <div class="success">
+                                <strong>✓ Success!</strong> ZIP filen er blevet downloaded.
+                            </div>
+                        `;
+                    } else {
+                        const error = await response.json();
+                        throw new Error(error.message || 'Kunne ikke downloade ZIP');
+                    }
+                } else {
+                    // Vis JSON resultat
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            url,
+                            maxPages,
+                            screenSize,
+                            format,
+                            quality,
+                            delay,
+                            fullPage,
+                            disableAnimations,
+                            autoScroll,
+                            outputFormat: 'json'
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        const progress = `
+                            <div class="progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${(data.data.successCount / data.data.totalPages * 100)}%">
+                                        ${data.data.successCount}/${data.data.totalPages}
+                                    </div>
+                                </div>
+                                <div class="progress-text">
+                                    ${data.data.successCount} success, ${data.data.failCount} fejl
+                                </div>
+                            </div>
+                        `;
+
+                        const grid = document.createElement('div');
+                        grid.className = 'screenshots-grid';
+
+                        data.data.screenshots.forEach(item => {
+                            if (item.success && item.screenshot) {
+                                const div = document.createElement('div');
+                                div.className = 'screenshot-item';
+                                div.onclick = () => {
+                                    const link = document.createElement('a');
+                                    link.href = `data:image/${item.format};base64,${item.screenshot}`;
+                                    link.download = `screenshot-${item.index}.${item.format}`;
+                                    link.click();
+                                };
+
+                                div.innerHTML = `
+                                    <img src="data:image/${item.format};base64,${item.screenshot}" alt="Screenshot ${item.index}">
+                                    <div class="screenshot-info">
+                                        <strong>#${item.index}</strong>
+                                        <div class="screenshot-url" title="${item.url}">${item.url}</div>
+                                    </div>
+                                `;
+                                grid.appendChild(div);
+                            }
+                        });
+
+                        const downloadAllBtn = document.createElement('button');
+                        downloadAllBtn.className = 'download-btn';
+                        downloadAllBtn.textContent = '⬇️ Download alle som ZIP';
+                        downloadAllBtn.onclick = async () => {
+                            // Brug allerede hentede screenshots
+                            downloadAllBtn.disabled = true;
+                            downloadAllBtn.textContent = 'Genererer ZIP...';
+                            
+                            try {
+                                const zipResponse = await fetch('http://localhost:3000/screenshot/generate-zip', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        screenshots: data.data.screenshots,
+                                        metadata: {
+                                            totalPages: data.data.totalPages,
+                                            successCount: data.data.successCount,
+                                            failCount: data.data.failCount,
+                                            screenSize: data.data.screenSize,
+                                            dimensions: data.data.dimensions,
+                                            timestamp: data.data.timestamp,
+                                            pages: data.data.screenshots.map(s => ({
+                                                index: s.index,
+                                                url: s.url,
+                                                success: s.success,
+                                                error: s.error || null
+                                            }))
+                                        }
+                                    })
+                                });
+
+                                if (zipResponse.ok) {
+                                    const blob = await zipResponse.blob();
+                                    const downloadUrl = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = downloadUrl;
+                                    a.download = `screenshots-${Date.now()}.zip`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    window.URL.revokeObjectURL(downloadUrl);
+                                }
+                            } finally {
+                                downloadAllBtn.disabled = false;
+                                downloadAllBtn.textContent = '⬇️ Download alle som ZIP';
+                            }
+                        };
+
+                        resultContent.innerHTML = progress;
+                        resultContent.appendChild(downloadAllBtn);
+                        resultContent.appendChild(grid);
+                    } else {
+                        throw new Error(data.message);
+                    }
+                }
+            } catch (error) {
+                resultContent.innerHTML = `
+                    <div class="error">
+                        <strong>Fejl:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Skjul kvalitet felt hvis PNG
+        document.getElementById('format').addEventListener('change', (e) => {
+            const qualityGroup = document.getElementById('quality').closest('.form-group');
+            if (e.target.value === 'jpeg') {
+                qualityGroup.style.display = 'block';
+            } else {
+                qualityGroup.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

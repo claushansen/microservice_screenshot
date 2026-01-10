@@ -1,5 +1,7 @@
 const express = require('express');
+const archiver = require('archiver');
 const { captureScreenshot } = require('./screenshotService');
+const { crawlWebsite } = require('./crawlerService');
 const { SCREEN_SIZES, DEFAULT_CONFIG } = require('./config');
 
 const app = express();
@@ -18,8 +20,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware til at parse JSON
-app.use(express.json());
+// Middleware til at parse JSON med øget size limit
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -165,6 +168,233 @@ app.post('/screenshot', async (req, res) => {
   }
 });
 
+// Crawler endpoint - tag screenshots af flere sider
+app.post('/screenshot/crawl', async (req, res) => {
+  try {
+    const { 
+      url, 
+      screenSize = 'desktop', 
+      format = DEFAULT_CONFIG.defaultFormat,
+      quality = DEFAULT_CONFIG.defaultQuality,
+      fullPage = false,
+      delay = DEFAULT_CONFIG.defaultDelay,
+      disableAnimations = true,
+      autoScroll = DEFAULT_CONFIG.autoScroll,
+      maxPages = 10,
+      outputFormat = 'json' // 'json' eller 'zip'
+    } = req.body;
+
+    // Valider påkrævet parameter
+    if (!url) {
+      return res.status(400).json({
+        error: 'Manglende parameter',
+        message: 'URL er påkrævet'
+      });
+    }
+
+    // Valider maxPages
+    const maxPagesNum = parseInt(maxPages);
+    if (isNaN(maxPagesNum) || maxPagesNum < 1 || maxPagesNum > 100) {
+      return res.status(400).json({
+        error: 'Ugyldig maxPages',
+        message: 'maxPages skal være mellem 1 og 100',
+        received: maxPages
+      });
+    }
+
+    // Valider output format
+    if (!['json', 'zip'].includes(outputFormat.toLowerCase())) {
+      return res.status(400).json({
+        error: 'Ugyldigt outputFormat',
+        message: 'outputFormat skal være "json" eller "zip"',
+        received: outputFormat
+      });
+    }
+
+    // Crawler websitet for at finde alle interne URLs
+    console.log(`Starter crawling af ${url} (max ${maxPagesNum} sider)...`);
+    const urls = await crawlWebsite(url, maxPagesNum);
+    console.log(`Fandt ${urls.length} sider. Tager screenshots...`);
+
+    // Tag screenshots af alle URLs
+    const screenshots = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < urls.length; i++) {
+      const pageUrl = urls[i];
+      try {
+        console.log(`Screenshot ${i + 1}/${urls.length}: ${pageUrl}`);
+        
+        const screenshot = await captureScreenshot(
+          pageUrl,
+          screenSize,
+          format.toLowerCase(),
+          parseInt(quality),
+          Boolean(fullPage),
+          parseInt(delay),
+          Boolean(disableAnimations),
+          Boolean(autoScroll)
+        );
+
+        screenshots.push({
+          url: pageUrl,
+          screenshot: screenshot,
+          format: format.toLowerCase(),
+          success: true,
+          index: i + 1
+        });
+        
+        successCount++;
+      } catch (error) {
+        console.error(`Fejl ved screenshot af ${pageUrl}:`, error.message);
+        screenshots.push({
+          url: pageUrl,
+          screenshot: null,
+          error: error.message,
+          success: false,
+          index: i + 1
+        });
+        failCount++;
+      }
+    }
+
+    // Return som JSON eller ZIP
+    if (outputFormat.toLowerCase() === 'zip') {
+      // Generer ZIP fil
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="screenshots-${Date.now()}.zip"`);
+
+      const archive = archiver('zip', {
+        zlib: { level: 9 }
+      });
+
+      archive.on('error', (err) => {
+        throw err;
+      });
+
+      archive.pipe(res);
+
+      // Tilføj hver screenshot til ZIP
+      for (const item of screenshots) {
+        if (item.success && item.screenshot) {
+          const buffer = Buffer.from(item.screenshot, 'base64');
+          const urlPath = new URL(item.url).pathname.replace(/\//g, '_') || 'index';
+          const filename = `${item.index}_${urlPath}.${item.format}`;
+          archive.append(buffer, { name: filename });
+        }
+      }
+
+      // Tilføj metadata fil
+      const metadata = {
+        totalPages: urls.length,
+        successCount: successCount,
+        failCount: failCount,
+        timestamp: new Date().toISOString(),
+        screenSize: screenSize,
+        dimensions: SCREEN_SIZES[screenSize],
+        settings: {
+          format: format.toLowerCase(),
+          fullPage: Boolean(fullPage),
+          delay: parseInt(delay),
+          disableAnimations: Boolean(disableAnimations),
+          autoScroll: Boolean(autoScroll)
+        },
+        pages: screenshots.map(s => ({
+          index: s.index,
+          url: s.url,
+          success: s.success,
+          error: s.error || null
+        }))
+      };
+
+      archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' });
+
+      await archive.finalize();
+
+    } else {
+      // Return som JSON
+      res.json({
+        success: true,
+        data: {
+          totalPages: urls.length,
+          successCount: successCount,
+          failCount: failCount,
+          screenshots: screenshots,
+          screenSize: screenSize,
+          dimensions: SCREEN_SIZES[screenSize],
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Crawler fejl:', error.message);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Crawler fejlede',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Generer ZIP fra eksisterende screenshots
+app.post('/screenshot/generate-zip', async (req, res) => {
+  try {
+    const { screenshots, metadata } = req.body;
+
+    if (!screenshots || !Array.isArray(screenshots)) {
+      return res.status(400).json({
+        error: 'Manglende parameter',
+        message: 'screenshots array er påkrævet'
+      });
+    }
+
+    // Generer ZIP fil
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="screenshots-${Date.now()}.zip"`);
+
+    const archive = archiver('zip', {
+      zlib: { level: 9 }
+    });
+
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    archive.pipe(res);
+
+    // Tilføj hver screenshot til ZIP
+    for (const item of screenshots) {
+      if (item.success && item.screenshot) {
+        const buffer = Buffer.from(item.screenshot, 'base64');
+        const urlPath = new URL(item.url).pathname.replace(/\//g, '_') || 'index';
+        const filename = `${item.index}_${urlPath}.${item.format}`;
+        archive.append(buffer, { name: filename });
+      }
+    }
+
+    // Tilføj metadata fil hvis provided
+    if (metadata) {
+      archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' });
+    }
+
+    await archive.finalize();
+
+  } catch (error) {
+    console.error('ZIP generation fejl:', error.message);
+    
+    res.status(500).json({
+      success: false,
+      error: 'ZIP generation fejlede',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
@@ -173,7 +403,9 @@ app.use((req, res) => {
     availableEndpoints: [
       'GET /health - Tjek service status',
       'GET /info - Vis tilgængelige skærmstørrelser og indstillinger',
-      'POST /screenshot - Tag screenshot af en URL'
+      'POST /screenshot - Tag screenshot af en URL',
+      'POST /screenshot/crawl - Crawler website og tag screenshots af alle sider',
+      'POST /screenshot/generate-zip - Generer ZIP fra eksisterende screenshots'
     ]
   });
 });
@@ -186,6 +418,8 @@ app.listen(PORT, () => {
   console.log(`  GET  http://localhost:${PORT}/health`);
   console.log(`  GET  http://localhost:${PORT}/info`);
   console.log(`  POST http://localhost:${PORT}/screenshot`);
+  console.log(`  POST http://localhost:${PORT}/screenshot/crawl`);
+  console.log(`  POST http://localhost:${PORT}/screenshot/generate-zip`);
 });
 
 module.exports = app;
