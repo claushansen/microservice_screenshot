@@ -5,13 +5,15 @@ En containeriseret microservice til at tage screenshots af websites med forskell
 ## Features
 
 - 📸 Tag screenshots af enhver URL
+- 🕷️ **Website Crawler** - Crawler hele websites og tag screenshots automatisk
 - 🖥️ 5 foruddefinerede skærmstørrelser (desktop, laptop, tablet, mobile, mobile-large)
 - 🎨 Understøtter PNG og JPEG formater
 - ⚙️ JPEG kvalitetskontrol (0-100)
 - 📄 Vælg mellem viewport eller full-page screenshots
-- � Auto-scroll gennem siden for at trigge scroll-baserede animationer
+- 🔄 Auto-scroll gennem siden for at trigge scroll-baserede animationer
 - ⏸️ Kontrollerbar delay for animationer og dynamisk indhold
 - ⚡ Disable CSS animationer for konsistente screenshots
+- 📦 **Download som ZIP** - Hent alle screenshots som en samlet ZIP fil
 - �🐳 Fuldt dockeriseret med Docker Compose
 - 🔄 Base64-kodet output via JSON API
 - ⏱️ 30 sekunders timeout med network idle wait strategy
@@ -115,6 +117,90 @@ Tag screenshot af en URL
 }
 ```
 
+### POST /screenshot/crawl
+Crawler et helt website og tag screenshots af alle interne sider
+
+**Request Body:**
+```json
+{
+  "url": "https://example.com",
+  "maxPages": 10,
+  "screenSize": "desktop",
+  "format": "png",
+  "quality": 80,
+  "fullPage": false,
+  "delay": 2000,
+  "disableAnimations": true,
+  "autoScroll": true,
+  "outputFormat": "json"
+}
+```
+
+**Parameters:**
+- `url` (required): Start URL at crawle fra
+- `maxPages` (optional): Maksimalt antal sider at crawle (default: 10, max: 100)
+- `screenSize` (optional): Skærmstørrelse (default: "desktop")
+- `format` (optional): Billedformat - "png" eller "jpeg" (default: "png")
+- `quality` (optional): JPEG kvalitet 0-100 (default: 80)
+- `fullPage` (optional): Tag screenshot af hele siden (default: false)
+- `delay` (optional): Ekstra ventetid per side i millisekunder (default: 2000)
+- `disableAnimations` (optional): Disable CSS animationer (default: true)
+- `autoScroll` (optional): Auto-scroll gennem siden (default: true)
+- `outputFormat` (optional): Output format - "json" eller "zip" (default: "json")
+
+**Success Response (200) - JSON format:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalPages": 5,
+    "successCount": 5,
+    "failCount": 0,
+    "screenshots": [
+      {
+        "url": "https://example.com",
+        "screenshot": "iVBORw0KGgoAAAANSUhEUgAA...",
+        "format": "png",
+        "success": true,
+        "index": 1
+      }
+    ],
+    "screenSize": "desktop",
+    "dimensions": { "width": 1920, "height": 1080 },
+    "timestamp": "2026-01-10T10:30:00.000Z"
+  }
+}
+```
+
+**Success Response (200) - ZIP format:**
+Returnerer en ZIP fil med alle screenshots og en metadata.json fil.
+
+### POST /screenshot/generate-zip
+Generer ZIP fil fra allerede hentede screenshots (undgår re-crawling)
+
+**Request Body:**
+```json
+{
+  "screenshots": [
+    {
+      "url": "https://example.com",
+      "screenshot": "base64...",
+      "format": "png",
+      "success": true,
+      "index": 1
+    }
+  ],
+  "metadata": {
+    "totalPages": 5,
+    "successCount": 5,
+    "timestamp": "2026-01-10T10:30:00.000Z"
+  }
+}
+```
+
+**Success Response (200):**
+Returnerer en ZIP fil med alle screenshots.
+
 **Error Response (400/500):**
 ```json
 {
@@ -161,6 +247,23 @@ docker run -p 3000:3000 screenshot-service
 
 Serveren kører nu på `http://localhost:3000`
 
+## Demo Interfaces
+
+To HTML demo interfaces er inkluderet:
+
+- **[example.html](example.html)** - Single screenshot interface
+  - Tag screenshots af enkelte URLs
+  - Juster alle parametre
+  - Preview og download
+
+- **[crawler.html](crawler.html)** - Website crawler interface
+  - Crawler hele websites automatisk
+  - Preview alle screenshots i grid
+  - Download som ZIP eller individuelle billeder
+  - Progress tracking
+
+Åbn filerne direkte i din browser når servicen kører.
+
 ## Eksempler
 
 ### cURL eksempel (PNG screenshot af desktop)
@@ -185,6 +288,26 @@ curl -X POST http://localhost:3000/screenshot \
 ```
 
 ### cURL eksempel (Med scroll-animationer og custom delay)
+```bash
+curl -X POST http://localhost:3000/screenshot \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "screenSize": "desktop", "autoScroll": true, "delay": 3000, "disableAnimations": false}'
+```
+
+### cURL eksempel (Crawler website med JSON output)
+```bash
+curl -X POST http://localhost:3000/screenshot/crawl \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "maxPages": 5, "screenSize": "desktop", "outputFormat": "json"}'
+```
+
+### cURL eksempel (Crawler website og download ZIP)
+```bash
+curl -X POST http://localhost:3000/screenshot/crawl \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "maxPages": 10, "screenSize": "laptop", "outputFormat": "zip"}' \
+  --output screenshots.zip
+```
 ```bash
 curl -X POST http://localhost:3000/screenshot \
   -H "Content-Type: application/json" \
@@ -248,6 +371,46 @@ if data['success']:
         f.write(screenshot_data)
 ```
 
+### Python eksempel (Crawler)
+```python
+import requests
+
+# Crawler website og få JSON med alle screenshots
+response = requests.post('http://localhost:3000/screenshot/crawl', json={
+    'url': 'https://example.com',
+    'maxPages': 10,
+    'screenSize': 'desktop',
+    'outputFormat': 'json'
+})
+
+data = response.json()
+
+if data['success']:
+    print(f"Crawled {data['data']['totalPages']} sider")
+    print(f"Success: {data['data']['successCount']}, Fejl: {data['data']['failCount']}")
+    
+    # Gem hver screenshot
+    for item in data['data']['screenshots']:
+        if item['success']:
+            screenshot_data = base64.b64decode(item['screenshot'])
+            filename = f"screenshot_{item['index']}.{item['format']}"
+            with open(filename, 'wb') as f:
+                f.write(screenshot_data)
+
+# Eller download direkte som ZIP
+zip_response = requests.post('http://localhost:3000/screenshot/crawl', json={
+    'url': 'https://example.com',
+    'maxPages': 10,
+    'outputFormat': 'zip'
+})
+
+if zip_response.ok:
+    with open('screenshots.zip', 'wb') as f:
+        f.write(zip_response.content)
+```
+        f.write(screenshot_data)
+```
+
 ## Environment Variables
 
 - `PORT`: Port nummeret serveren skal køre på (default: 3000)
@@ -271,9 +434,29 @@ ports:
 Servicen returnerer følgende fejltyper:
 
 - **400 Bad Request**: Ugyldig parameter (manglende URL, ugyldig screenSize, ugyldigt format, ugyldig delay, etc.)
+- **413 Payload Too Large**: Request body er for stor (øget til 100MB limit)
 - **500 Internal Server Error**: Screenshot fejlede (timeout, connection refused, etc.)
 
 Fejlbeskeder er på dansk og giver detaljerede beskrivelser af problemet.
+
+## Crawler Funktionalitet
+
+Website crawleren finder automatisk alle interne links på en side og tager screenshots af hver side.
+
+**Funktioner:**
+- 🔍 Finder automatisk alle interne URLs (samme domain)
+- 🚫 Ignorerer eksterne links og duplikater
+- ⚙️ Kontrollerbar max antal sider (1-100)
+- 📊 Progress tracking med success/fail count
+- 💾 Download som JSON eller ZIP
+- 🖼️ Preview i browser før download (JSON mode)
+- 📦 ZIP inkluderer metadata.json fil
+
+**Begrænsninger:**
+- Max 100 sider per crawl
+- Kun interne links (samme domain)
+- 15 sekunders timeout per side
+- URL fragments (#) fjernes automatisk
 
 ## Use Cases
 
@@ -310,11 +493,23 @@ Hurtigst muligt screenshot af viewport uden scroll eller delay.
 ```
 Lader animationer køre i 5 sekunder og fanger dem i deres animerede tilstand.
 
+### Crawler et helt website
+```json
+{
+  "url": "https://example.com",
+  "maxPages": 20,
+  "screenSize": "laptop",
+  "outputFormat": "zip"
+}
+```
+Crawler op til 20 sider og download alle screenshots som ZIP fil.
+
 ## Teknologi Stack
 
 - **Node.js**: Runtime miljø
 - **Express**: Web framework
 - **Puppeteer**: Headless browser automation
+- **Archiver**: ZIP file generation
 - **Docker**: Containerization
 - **Alpine Linux**: Letvægts container base image
 
