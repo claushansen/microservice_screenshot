@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenshot Service - Flere Størrelser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .size-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .size-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .size-option:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .size-option input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .size-option.selected {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .result h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .screenshot-card {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .screenshot-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .screenshot-card img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            margin-bottom: 10px;
+        }
+
+        .screenshot-info {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            text-align: left;
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .screenshot-info div {
+            margin-bottom: 3px;
+        }
+
+        .screenshot-info strong {
+            color: #333;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #c33;
+        }
+
+        .loading {
+            color: #667eea;
+            font-size: 1.1em;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-btn {
+            background: #28a745;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .stats {
+            background: #f0f2ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .stat-item {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 600px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .screenshots-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Screenshot Service - Flere Størrelser</h1>
+        <p class="subtitle">Tag screenshots i flere forskellige størrelser på én gang - siden loades kun én gang!</p>
+
+        <form id="screenshotForm">
+            <div class="form-group">
+                <label for="url">Website URL *</label>
+                <input type="text" id="url" placeholder="https://example.com" value="https://example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label>Vælg skærmstørrelser (mindst én) *</label>
+                <div class="size-selector">
+                    <div class="size-option" data-size="desktop">
+                        <input type="checkbox" id="size-desktop" value="desktop" checked>
+                        <label for="size-desktop" style="margin-bottom: 0; cursor: pointer;">
+                            <strong>Desktop</strong><br>
+                            <small>1920 × 1080</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="laptop">
+                        <input type="checkbox" id="size-laptop" value="laptop" checked>
+                        <label for="size-laptop" style="margin-bottom: 0; cursor: pointer;">
+                            <strong>Laptop</strong><br>
+                            <small>1366 × 768</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="tablet">
+                        <input type="checkbox" id="size-tablet" value="tablet" checked>
+                        <label for="size-tablet" style="margin-bottom: 0; cursor: pointer;">
+                            <strong>Tablet</strong><br>
+                            <small>768 × 1024</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="mobile">
+                        <input type="checkbox" id="size-mobile" value="mobile" checked>
+                        <label for="size-mobile" style="margin-bottom: 0; cursor: pointer;">
+                            <strong>Mobile</strong><br>
+                            <small>375 × 667</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="mobile-large">
+                        <input type="checkbox" id="size-mobile-large" value="mobile-large">
+                        <label for="size-mobile-large" style="margin-bottom: 0; cursor: pointer;">
+                            <strong>Mobile Large</strong><br>
+                            <small>414 × 896</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="format">Format</label>
+                    <select id="format">
+                        <option value="png">PNG</option>
+                        <option value="jpeg">JPEG</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="quality">JPEG Kvalitet (0-100)</label>
+                    <input type="number" id="quality" min="0" max="100" value="80">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="delay">Ekstra ventetid i millisekunder (0-30000)</label>
+                <input type="number" id="delay" min="0" max="30000" value="2000">
+                <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">Giver animationer og dynamisk indhold tid til at rendere</small>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="disableAnimations" checked>
+                    <label for="disableAnimations" style="margin-bottom: 0;">Disable CSS animationer</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="autoScroll" checked>
+                    <label for="autoScroll" style="margin-bottom: 0;">Auto-scroll gennem siden</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="fullPage">
+                    <label for="fullPage" style="margin-bottom: 0;">Tag screenshot af hele siden</label>
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">Tag Screenshots</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <h2>Resultater</h2>
+            <div class="stats" id="stats"></div>
+            <div id="resultContent" class="screenshots-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('screenshotForm');
+        const resultDiv = document.getElementById('result');
+        const resultContent = document.getElementById('resultContent');
+        const statsDiv = document.getElementById('stats');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // API endpoint
+        const API_URL = 'http://localhost:3000/screenshot/multiple-sizes';
+
+        // Handle size option clicks
+        document.querySelectorAll('.size-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                if (e.target.tagName !== 'INPUT') {
+                    const checkbox = option.querySelector('input[type="checkbox"]');
+                    checkbox.checked = !checkbox.checked;
+                }
+                updateSizeOptionStyles();
+            });
+        });
+
+        document.querySelectorAll('.size-option input').forEach(checkbox => {
+            checkbox.addEventListener('change', updateSizeOptionStyles);
+        });
+
+        function updateSizeOptionStyles() {
+            document.querySelectorAll('.size-option').forEach(option => {
+                const checkbox = option.querySelector('input[type="checkbox"]');
+                if (checkbox.checked) {
+                    option.classList.add('selected');
+                } else {
+                    option.classList.remove('selected');
+                }
+            });
+        }
+
+        // Initialize styles
+        updateSizeOptionStyles();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Hent form values
+            const url = document.getElementById('url').value;
+            const format = document.getElementById('format').value;
+            const quality = parseInt(document.getElementById('quality').value);
+            const fullPage = document.getElementById('fullPage').checked;
+            const delay = parseInt(document.getElementById('delay').value);
+            const disableAnimations = document.getElementById('disableAnimations').checked;
+            const autoScroll = document.getElementById('autoScroll').checked;
+
+            // Hent valgte størrelser
+            const screenSizes = [];
+            document.querySelectorAll('.size-option input:checked').forEach(checkbox => {
+                screenSizes.push(checkbox.value);
+            });
+
+            if (screenSizes.length === 0) {
+                alert('Vælg mindst én skærmstørrelse');
+                return;
+            }
+
+            // Vis loading state
+            resultDiv.style.display = 'block';
+            resultContent.innerHTML = '<div class="spinner"></div><p class="loading">Tager screenshots i ' + screenSizes.length + ' størrelser...</p>';
+            statsDiv.innerHTML = '';
+            submitBtn.disabled = true;
+
+            const startTime = Date.now();
+
+            try {
+                // Send request
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url,
+                        screenSizes,
+                        format,
+                        quality,
+                        fullPage,
+                        delay,
+                        disableAnimations,
+                        autoScroll
+                    })
+                });
+
+                const data = await response.json();
+                const endTime = Date.now();
+                const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+                if (data.success) {
+                    // Vis stats
+                    statsDiv.innerHTML = `
+                        <div class="stat-item">
+                            <div class="stat-value">${data.data.totalScreenshots}</div>
+                            <div class="stat-label">Screenshots</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${duration}s</div>
+                            <div class="stat-label">Total tid</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${(duration / data.data.totalScreenshots).toFixed(2)}s</div>
+                            <div class="stat-label">Per screenshot</div>
+                        </div>
+                    `;
+
+                    // Vis screenshots
+                    resultContent.innerHTML = '';
+                    data.data.screenshots.forEach(screenshot => {
+                        const card = document.createElement('div');
+                        card.className = 'screenshot-card';
+
+                        const img = document.createElement('img');
+                        img.src = `data:image/${screenshot.format};base64,${screenshot.screenshot}`;
+                        img.alt = `Screenshot ${screenshot.screenSize}`;
+
+                        const title = document.createElement('h3');
+                        title.textContent = screenshot.screenSize.toUpperCase();
+
+                        const info = document.createElement('div');
+                        info.className = 'screenshot-info';
+                        info.innerHTML = `
+                            <div><strong>Dimensioner:</strong> ${screenshot.dimensions.width} × ${screenshot.dimensions.height}</div>
+                            <div><strong>Format:</strong> ${screenshot.format.toUpperCase()}</div>
+                        `;
+
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.className = 'download-btn';
+                        downloadBtn.textContent = '⬇️ Download';
+                        downloadBtn.onclick = () => {
+                            const link = document.createElement('a');
+                            link.href = `data:image/${screenshot.format};base64,${screenshot.screenshot}`;
+                            link.download = `screenshot-${screenshot.screenSize}-${Date.now()}.${screenshot.format}`;
+                            link.click();
+                        };
+
+                        card.appendChild(title);
+                        card.appendChild(img);
+                        card.appendChild(info);
+                        card.appendChild(downloadBtn);
+                        resultContent.appendChild(card);
+                    });
+                } else {
+                    // Vis fejl
+                    resultContent.innerHTML = `
+                        <div class="error">
+                            <strong>Fejl:</strong> ${data.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                // Network eller anden fejl
+                resultContent.innerHTML = `
+                    <div class="error">
+                        <strong>Forbindelsesfejl:</strong> Kunne ikke oprette forbindelse til screenshot service. 
+                        Sørg for at servicen kører på ${API_URL}
+                        <br><br>
+                        <strong>Fejlbesked:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Skjul/vis kvalitet baseret på format
+        document.getElementById('format').addEventListener('change', (e) => {
+            const qualityGroup = document.getElementById('quality').closest('.form-group');
+            if (e.target.value === 'jpeg') {
+                qualityGroup.style.display = 'block';
+            } else {
+                qualityGroup.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

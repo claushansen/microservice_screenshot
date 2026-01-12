@@ -165,6 +165,166 @@ async function closeBrowser() {
   }
 }
 
+/**
+ * Tag screenshots af samme URL i flere forskellige skærmstørrelser
+ * @param {string} url - URL til at tage screenshots af
+ * @param {string[]} screenSizes - Array af skærmstørrelser
+ * @param {string} format - Billedformat (png eller jpeg)
+ * @param {number} quality - JPEG kvalitet (0-100)
+ * @param {boolean} fullPage - Tag screenshot af hele siden
+ * @param {number} delay - Ekstra ventetid i millisekunder
+ * @param {boolean} disableAnimations - Disable CSS animationer
+ * @param {boolean} autoScroll - Auto-scroll gennem siden
+ * @returns {Promise<Array>} Array af screenshots med metadata
+ */
+async function captureMultipleScreenshots(
+  url, 
+  screenSizes = ['desktop'], 
+  format = 'png', 
+  quality = 80, 
+  fullPage = false, 
+  delay = 2000, 
+  disableAnimations = true, 
+  autoScroll = true
+) {
+  // Valider URL
+  if (!url || !url.startsWith('http')) {
+    throw new Error('Ugyldig URL. URL skal starte med http:// eller https://');
+  }
+
+  // Valider skærmstørrelser
+  for (const size of screenSizes) {
+    if (!SCREEN_SIZES[size]) {
+      throw new Error(`Ugyldig skærmstørrelse: ${size}. Tilgængelige: ${Object.keys(SCREEN_SIZES).join(', ')}`);
+    }
+  }
+
+  let browserInstance = null;
+  let page = null;
+  const screenshots = [];
+
+  try {
+    // Initialiser browser
+    browserInstance = await puppeteer.launch({
+      headless: 'new',
+      args: DEFAULT_CONFIG.puppeteerArgs
+    });
+
+    page = await browserInstance.newPage();
+
+    // Naviger til URL én gang
+    await page.goto(url, {
+      waitUntil: 'networkidle0',
+      timeout: DEFAULT_CONFIG.timeout
+    });
+
+    // Auto-scroll hvis ønsket
+    if (autoScroll) {
+      await page.evaluate(async () => {
+        await new Promise((resolve) => {
+          let totalHeight = 0;
+          const distance = 100;
+          const timer = setInterval(() => {
+            const scrollHeight = document.body.scrollHeight;
+            window.scrollBy(0, distance);
+            totalHeight += distance;
+
+            if (totalHeight >= scrollHeight) {
+              clearInterval(timer);
+              window.scrollTo(0, 0);
+              resolve();
+            }
+          }, 100);
+        });
+      });
+
+      await page.waitForTimeout(500);
+    }
+
+    // Disable animationer hvis ønsket
+    if (disableAnimations) {
+      await page.addStyleTag({
+        content: `
+          *, *::before, *::after {
+            animation-duration: 0s !important;
+            animation-delay: 0s !important;
+            transition-duration: 0s !important;
+            transition-delay: 0s !important;
+            scroll-behavior: auto !important;
+          }
+        `
+      });
+    }
+
+    // Vent ekstra tid
+    if (delay > 0) {
+      await page.waitForTimeout(delay);
+    }
+
+    // Tag screenshot i hver skærmstørrelse
+    for (const screenSize of screenSizes) {
+      const viewport = SCREEN_SIZES[screenSize];
+
+      // Sæt viewport
+      await page.setViewport({
+        width: viewport.width,
+        height: viewport.height,
+        deviceScaleFactor: 1
+      });
+
+      // Kort pause efter viewport change
+      await page.waitForTimeout(300);
+
+      // Tag screenshot
+      const screenshotOptions = {
+        encoding: 'base64',
+        fullPage: fullPage,
+        type: format.toLowerCase()
+      };
+
+      if (format.toLowerCase() === 'jpeg') {
+        screenshotOptions.quality = quality;
+      }
+
+      const screenshot = await page.screenshot(screenshotOptions);
+
+      screenshots.push({
+        screenSize: screenSize,
+        dimensions: viewport,
+        screenshot: screenshot,
+        format: format.toLowerCase(),
+        success: true
+      });
+
+      console.log(`Screenshot ${screenSize} (${viewport.width}x${viewport.height}) - Success`);
+    }
+
+    await page.close();
+    await browserInstance.close();
+
+    return screenshots;
+
+  } catch (error) {
+    if (page) await page.close();
+    if (browserInstance) await browserInstance.close();
+
+    // Håndter specifikke fejl
+    if (error.name === 'TimeoutError') {
+      throw new Error(`Timeout: Kunne ikke indlæse siden inden for ${DEFAULT_CONFIG.timeout / 1000} sekunder`);
+    }
+    
+    if (error.message.includes('net::ERR_NAME_NOT_RESOLVED')) {
+      throw new Error('Kunne ikke finde serveren. Tjek at URL er korrekt');
+    }
+
+    if (error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+      throw new Error('Forbindelsen blev afvist af serveren');
+    }
+
+    throw new Error(`Fejl ved screenshots: ${error.message}`);
+  }
+}
+
 // Luk browser ved proces afslutning
 process.on('SIGINT', async () => {
   await closeBrowser();
@@ -178,5 +338,6 @@ process.on('SIGTERM', async () => {
 
 module.exports = {
   captureScreenshot,
+  captureMultipleScreenshots,
   closeBrowser
 };
