@@ -283,6 +283,48 @@
             margin-top: 5px;
         }
 
+        .size-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .size-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .size-option:hover {
+            border-color: #11998e;
+            background: #f0fff8;
+        }
+
+        .size-option input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .size-option.selected {
+            border-color: #11998e;
+            background: #e6fff6;
+        }
+
+        .size-option label {
+            margin: 0;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
         @media (max-width: 600px) {
             .row {
                 grid-template-columns: 1fr;
@@ -329,7 +371,49 @@
                         <option value="tablet">Tablet (768x1024)</option>
                         <option value="mobile">Mobile (375x667)</option>
                         <option value="mobile-large">Mobile Large (414x896)</option>
+                        <option value="multiple">Forskellige Størrelser</option>
                     </select>
+                </div>
+            </div>
+
+            <div id="sizeSelectorContainer" class="form-group" style="display: none;">
+                <label>Vælg størrelser (mindst én) *</label>
+                <div class="size-selector">
+                    <div class="size-option" data-size="desktop">
+                        <input type="checkbox" id="size-desktop" value="desktop" checked>
+                        <label for="size-desktop">
+                            <strong>Desktop</strong><br>
+                            <small>1920 × 1080</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="laptop">
+                        <input type="checkbox" id="size-laptop" value="laptop">
+                        <label for="size-laptop">
+                            <strong>Laptop</strong><br>
+                            <small>1366 × 768</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="tablet">
+                        <input type="checkbox" id="size-tablet" value="tablet">
+                        <label for="size-tablet">
+                            <strong>Tablet</strong><br>
+                            <small>768 × 1024</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="mobile">
+                        <input type="checkbox" id="size-mobile" value="mobile">
+                        <label for="size-mobile">
+                            <strong>Mobile</strong><br>
+                            <small>375 × 667</small>
+                        </label>
+                    </div>
+                    <div class="size-option" data-size="mobile-large">
+                        <input type="checkbox" id="size-mobile-large" value="mobile-large">
+                        <label for="size-mobile-large">
+                            <strong>Mobile Large</strong><br>
+                            <small>414 × 896</small>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -403,6 +487,48 @@
         const submitBtn = document.getElementById('submitBtn');
 
         const API_URL = 'http://localhost:3000/screenshot/crawl';
+        const API_URL_MULTIPLE = 'http://localhost:3000/screenshot/multiple-sizes';
+
+        // Handle screen size dropdown change
+        const screenSizeSelect = document.getElementById('screenSize');
+        const sizeSelectorContainer = document.getElementById('sizeSelectorContainer');
+
+        screenSizeSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'multiple') {
+                sizeSelectorContainer.style.display = 'block';
+            } else {
+                sizeSelectorContainer.style.display = 'none';
+            }
+        });
+
+        // Handle size option clicks
+        document.querySelectorAll('.size-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                if (e.target.tagName !== 'INPUT') {
+                    const checkbox = option.querySelector('input[type="checkbox"]');
+                    checkbox.checked = !checkbox.checked;
+                }
+                updateSizeOptionStyles();
+            });
+        });
+
+        document.querySelectorAll('.size-option input').forEach(checkbox => {
+            checkbox.addEventListener('change', updateSizeOptionStyles);
+        });
+
+        function updateSizeOptionStyles() {
+            document.querySelectorAll('.size-option').forEach(option => {
+                const checkbox = option.querySelector('input[type="checkbox"]');
+                if (checkbox.checked) {
+                    option.classList.add('selected');
+                } else {
+                    option.classList.remove('selected');
+                }
+            });
+        }
+
+        // Initialize styles
+        updateSizeOptionStyles();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -418,12 +544,227 @@
             const autoScroll = document.getElementById('autoScroll').checked;
             const outputFormat = document.querySelector('input[name="outputFormat"]:checked').value;
 
+            // Hvis multiple sizes er valgt, hent de valgte størrelser
+            let screenSizes = [];
+            let isMultipleSizes = false;
+            if (screenSize === 'multiple') {
+                isMultipleSizes = true;
+                document.querySelectorAll('.size-option input:checked').forEach(checkbox => {
+                    screenSizes.push(checkbox.value);
+                });
+                if (screenSizes.length === 0) {
+                    alert('Vælg mindst én skærmstørrelse');
+                    return;
+                }
+            }
+
             resultDiv.style.display = 'block';
             resultContent.innerHTML = '<div class="spinner"></div><p class="loading">Crawler website og tager screenshots...</p>';
             submitBtn.disabled = true;
 
             try {
-                if (outputFormat === 'zip') {
+                // Hvis multiple sizes, crawler først og tag derefter screenshots
+                if (isMultipleSizes) {
+                    // Først: Crawler for at finde alle URLs
+                    const crawlResponse = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            url,
+                            maxPages,
+                            screenSize: 'desktop',
+                            format: 'png',
+                            quality: 80,
+                            delay: 0,
+                            fullPage: false,
+                            disableAnimations: true,
+                            autoScroll: false,
+                            outputFormat: 'json'
+                        })
+                    });
+
+                    const crawlData = await crawlResponse.json();
+                    if (!crawlData.success) {
+                        throw new Error(crawlData.message);
+                    }
+
+                    const urls = crawlData.data.screenshots
+                        .filter(s => s.success)
+                        .map(s => s.url);
+
+                    resultContent.innerHTML = `<div class="spinner"></div><p class="loading">Fandt ${urls.length} sider. Tager screenshots i ${screenSizes.length} størrelser...</p>`;
+
+                    // Anden: Tag screenshots i alle størrelser for hver URL
+                    const allScreenshots = [];
+                    let processedCount = 0;
+
+                    for (const pageUrl of urls) {
+                        try {
+                            const screenshotResponse = await fetch(API_URL_MULTIPLE, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    url: pageUrl,
+                                    screenSizes,
+                                    format,
+                                    quality,
+                                    fullPage,
+                                    delay,
+                                    disableAnimations,
+                                    autoScroll
+                                })
+                            });
+
+                            const screenshotData = await screenshotResponse.json();
+                            if (screenshotData.success) {
+                                screenshotData.data.screenshots.forEach((screenshot) => {
+                                    allScreenshots.push({
+                                        url: pageUrl,
+                                        screenSize: screenshot.screenSize,
+                                        dimensions: screenshot.dimensions,
+                                        screenshot: screenshot.screenshot,
+                                        format: screenshot.format,
+                                        success: true,
+                                        index: allScreenshots.length + 1
+                                    });
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`Fejl ved ${pageUrl}:`, error);
+                        }
+
+                        processedCount++;
+                        resultContent.innerHTML = `<div class="spinner"></div><p class="loading">Processerer side ${processedCount}/${urls.length}...</p>`;
+                    }
+
+                    // Hvis ZIP output, generer ZIP
+                    if (outputFormat === 'zip') {
+                        const zipResponse = await fetch('http://localhost:3000/screenshot/generate-zip', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                screenshots: allScreenshots,
+                                metadata: {
+                                    totalPages: urls.length,
+                                    screenSizes: screenSizes,
+                                    timestamp: new Date().toISOString()
+                                }
+                            })
+                        });
+
+                        if (zipResponse.ok) {
+                            const blob = await zipResponse.blob();
+                            const downloadUrl = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = downloadUrl;
+                            a.download = `screenshots-multiple-${Date.now()}.zip`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(downloadUrl);
+
+                            resultContent.innerHTML = `
+                                <div class="success">
+                                    <strong>✓ Success!</strong> ZIP fil med ${allScreenshots.length} screenshots (${urls.length} sider × ${screenSizes.length} størrelser) er blevet downloaded.
+                                </div>
+                            `;
+                        } else {
+                            throw new Error('Kunne ikke generere ZIP');
+                        }
+                    } else {
+                        // Vis JSON resultat med grid
+                        const progress = `
+                            <div class="progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 100%">
+                                        ${allScreenshots.length} screenshots
+                                    </div>
+                                </div>
+                                <div class="progress-text">
+                                    ${urls.length} sider × ${screenSizes.length} størrelser = ${allScreenshots.length} total screenshots
+                                </div>
+                            </div>
+                        `;
+
+                        const grid = document.createElement('div');
+                        grid.className = 'screenshots-grid';
+
+                        allScreenshots.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'screenshot-item';
+                            div.onclick = () => {
+                                const urlObj = new URL(item.url);
+                                const domain = urlObj.hostname.replace(/\./g, '_');
+                                const path = urlObj.pathname.replace(/\//g, '_').replace(/^_/, '') || 'index';
+                                const filename = `${domain}_${path}_${item.screenSize}.${item.format}`;
+                                
+                                const link = document.createElement('a');
+                                link.href = `data:image/${item.format};base64,${item.screenshot}`;
+                                link.download = filename;
+                                link.click();
+                            };
+
+                            div.innerHTML = `
+                                <img src="data:image/${item.format};base64,${item.screenshot}" alt="Screenshot">
+                                <div class="screenshot-info">
+                                    <strong>${item.screenSize}</strong>
+                                    <div class="screenshot-url" title="${item.url}">${item.url}</div>
+                                </div>
+                            `;
+                            grid.appendChild(div);
+                        });
+
+                        const downloadAllBtn = document.createElement('button');
+                        downloadAllBtn.className = 'download-btn';
+                        downloadAllBtn.textContent = '⬇️ Download alle som ZIP';
+                        downloadAllBtn.onclick = async () => {
+                            downloadAllBtn.disabled = true;
+                            downloadAllBtn.textContent = 'Genererer ZIP...';
+                            
+                            try {
+                                const zipResponse = await fetch('http://localhost:3000/screenshot/generate-zip', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        screenshots: allScreenshots,
+                                        metadata: {
+                                            totalPages: urls.length,
+                                            screenSizes: screenSizes,
+                                            timestamp: new Date().toISOString()
+                                        }
+                                    })
+                                });
+
+                                if (zipResponse.ok) {
+                                    const blob = await zipResponse.blob();
+                                    const downloadUrl = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = downloadUrl;
+                                    a.download = `screenshots-multiple-${Date.now()}.zip`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    window.URL.revokeObjectURL(downloadUrl);
+                                }
+                            } finally {
+                                downloadAllBtn.disabled = false;
+                                downloadAllBtn.textContent = '⬇️ Download alle som ZIP';
+                            }
+                        };
+
+                        resultContent.innerHTML = progress;
+                        resultContent.appendChild(downloadAllBtn);
+                        resultContent.appendChild(grid);
+                    }
+                } else if (outputFormat === 'zip') {
                     // Download som ZIP
                     const response = await fetch(API_URL, {
                         method: 'POST',
@@ -509,9 +850,15 @@
                                 const div = document.createElement('div');
                                 div.className = 'screenshot-item';
                                 div.onclick = () => {
+                                    const urlObj = new URL(item.url);
+                                    const domain = urlObj.hostname.replace(/\./g, '_');
+                                    const path = urlObj.pathname.replace(/\//g, '_').replace(/^_/, '') || 'index';
+                                    const sizeStr = data.data.screenSize ? `_${data.data.screenSize}` : '';
+                                    const filename = `${domain}_${path}${sizeStr}.${item.format}`;
+                                    
                                     const link = document.createElement('a');
                                     link.href = `data:image/${item.format};base64,${item.screenshot}`;
-                                    link.download = `screenshot-${item.index}.${item.format}`;
+                                    link.download = filename;
                                     link.click();
                                 };
 

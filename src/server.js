@@ -1,6 +1,6 @@
 const express = require('express');
 const archiver = require('archiver');
-const { captureScreenshot } = require('./screenshotService');
+const { captureScreenshot, captureMultipleScreenshots } = require('./screenshotService');
 const { crawlWebsite } = require('./crawlerService');
 const { SCREEN_SIZES, DEFAULT_CONFIG } = require('./config');
 
@@ -240,6 +240,7 @@ app.post('/screenshot/crawl', async (req, res) => {
         screenshots.push({
           url: pageUrl,
           screenshot: screenshot,
+          screenSize: screenSize,
           format: format.toLowerCase(),
           success: true,
           index: i + 1
@@ -279,9 +280,21 @@ app.post('/screenshot/crawl', async (req, res) => {
       for (const item of screenshots) {
         if (item.success && item.screenshot) {
           const buffer = Buffer.from(item.screenshot, 'base64');
-          const urlPath = new URL(item.url).pathname.replace(/\//g, '_') || 'index';
-          const filename = `${item.index}_${urlPath}.${item.format}`;
-          archive.append(buffer, { name: filename });
+          
+          try {
+            const urlObj = new URL(item.url);
+            const domain = urlObj.hostname.replace(/\./g, '_');
+            let path = urlObj.pathname.replace(/\//g, '_').replace(/^_/, '');
+            if (!path || path === '') path = 'index';
+            const sizeStr = item.screenSize ? `_${item.screenSize}` : '';
+            const filename = `${domain}_${path}${sizeStr}.${item.format}`;
+            archive.append(buffer, { name: filename });
+          } catch (error) {
+            console.error(`Error parsing URL ${item.url}:`, error);
+            // Fallback til index-baseret navn hvis URL parsing fejler
+            const filename = `screenshot_${item.index}.${item.format}`;
+            archive.append(buffer, { name: filename });
+          }
         }
       }
 
@@ -340,6 +353,100 @@ app.post('/screenshot/crawl', async (req, res) => {
   }
 });
 
+// Screenshot endpoint - flere skærmstørrelser på én gang
+app.post('/screenshot/multiple-sizes', async (req, res) => {
+  try {
+    const { 
+      url, 
+      screenSizes = ['desktop'],
+      format = DEFAULT_CONFIG.defaultFormat,
+      quality = DEFAULT_CONFIG.defaultQuality,
+      fullPage = false,
+      delay = DEFAULT_CONFIG.defaultDelay,
+      disableAnimations = true,
+      autoScroll = DEFAULT_CONFIG.autoScroll
+    } = req.body;
+
+    // Valider påkrævet parameter
+    if (!url) {
+      return res.status(400).json({
+        error: 'Manglende parameter',
+        message: 'URL er påkrævet'
+      });
+    }
+
+    // Valider screenSizes array
+    if (!Array.isArray(screenSizes) || screenSizes.length === 0) {
+      return res.status(400).json({
+        error: 'Ugyldig screenSizes',
+        message: 'screenSizes skal være et array med mindst én skærmstørrelse',
+        available: Object.keys(SCREEN_SIZES)
+      });
+    }
+
+    // Valider hver skærmstørrelse
+    for (const size of screenSizes) {
+      if (!SCREEN_SIZES[size]) {
+        return res.status(400).json({
+          error: 'Ugyldig skærmstørrelse',
+          message: `"${size}" er ikke en gyldig skærmstørrelse`,
+          available: Object.keys(SCREEN_SIZES)
+        });
+      }
+    }
+
+    // Valider format
+    const formatLower = format.toLowerCase();
+    if (!['png', 'jpeg'].includes(formatLower)) {
+      return res.status(400).json({
+        error: 'Ugyldigt format',
+        message: 'Format skal være "png" eller "jpeg"'
+      });
+    }
+
+    // Tag screenshots i alle størrelser
+    console.log(`Tager screenshots af ${url} i ${screenSizes.length} størrelser...`);
+    const screenshots = await captureMultipleScreenshots(
+      url,
+      screenSizes,
+      formatLower,
+      parseInt(quality),
+      Boolean(fullPage),
+      parseInt(delay),
+      Boolean(disableAnimations),
+      Boolean(autoScroll)
+    );
+
+    // Return screenshots
+    res.json({
+      success: true,
+      data: {
+        url: url,
+        screenshots: screenshots,
+        totalScreenshots: screenshots.length,
+        settings: {
+          format: formatLower,
+          fullPage: Boolean(fullPage),
+          delay: parseInt(delay),
+          disableAnimations: Boolean(disableAnimations),
+          autoScroll: Boolean(autoScroll)
+        },
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Multiple screenshots fejl:', error.message);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Multiple screenshots fejlede',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Generer ZIP fra eksisterende screenshots
 app.post('/screenshot/generate-zip', async (req, res) => {
   try {
@@ -370,9 +477,21 @@ app.post('/screenshot/generate-zip', async (req, res) => {
     for (const item of screenshots) {
       if (item.success && item.screenshot) {
         const buffer = Buffer.from(item.screenshot, 'base64');
-        const urlPath = new URL(item.url).pathname.replace(/\//g, '_') || 'index';
-        const filename = `${item.index}_${urlPath}.${item.format}`;
-        archive.append(buffer, { name: filename });
+        
+        try {
+          const urlObj = new URL(item.url);
+          const domain = urlObj.hostname.replace(/\./g, '_');
+          let path = urlObj.pathname.replace(/\//g, '_').replace(/^_/, '');
+          if (!path || path === '') path = 'index';
+          const sizeStr = item.screenSize ? `_${item.screenSize}` : '';
+          const filename = `${domain}_${path}${sizeStr}.${item.format}`;
+          archive.append(buffer, { name: filename });
+        } catch (error) {
+          console.error(`Error parsing URL ${item.url}:`, error);
+          // Fallback til index-baseret navn hvis URL parsing fejler
+          const filename = `screenshot_${item.index}.${item.format}`;
+          archive.append(buffer, { name: filename });
+        }
       }
     }
 
@@ -404,6 +523,7 @@ app.use((req, res) => {
       'GET /health - Tjek service status',
       'GET /info - Vis tilgængelige skærmstørrelser og indstillinger',
       'POST /screenshot - Tag screenshot af en URL',
+      'POST /screenshot/multiple-sizes - Tag screenshots i flere størrelser på én gang',
       'POST /screenshot/crawl - Crawler website og tag screenshots af alle sider',
       'POST /screenshot/generate-zip - Generer ZIP fra eksisterende screenshots'
     ]
@@ -418,6 +538,7 @@ app.listen(PORT, () => {
   console.log(`  GET  http://localhost:${PORT}/health`);
   console.log(`  GET  http://localhost:${PORT}/info`);
   console.log(`  POST http://localhost:${PORT}/screenshot`);
+  console.log(`  POST http://localhost:${PORT}/screenshot/multiple-sizes`);
   console.log(`  POST http://localhost:${PORT}/screenshot/crawl`);
   console.log(`  POST http://localhost:${PORT}/screenshot/generate-zip`);
 });

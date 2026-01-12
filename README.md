@@ -7,6 +7,7 @@ En containeriseret microservice til at tage screenshots af websites med forskell
 - 📸 Tag screenshots af enhver URL
 - 🕷️ **Website Crawler** - Crawler hele websites og tag screenshots automatisk
 - 🖥️ 5 foruddefinerede skærmstørrelser (desktop, laptop, tablet, mobile, mobile-large)
+- 📐 **Multiple Sizes** - Tag screenshots i flere størrelser uden at genindlæse siden
 - 🎨 Understøtter PNG og JPEG formater
 - ⚙️ JPEG kvalitetskontrol (0-100)
 - 📄 Vælg mellem viewport eller full-page screenshots
@@ -14,6 +15,7 @@ En containeriseret microservice til at tage screenshots af websites med forskell
 - ⏸️ Kontrollerbar delay for animationer og dynamisk indhold
 - ⚡ Disable CSS animationer for konsistente screenshots
 - 📦 **Download som ZIP** - Hent alle screenshots som en samlet ZIP fil
+- 📝 **Smart filnavngivning** - domain_path_size.extension (f.eks. example_com_about_mobile.png)
 - �🐳 Fuldt dockeriseret med Docker Compose
 - 🔄 Base64-kodet output via JSON API
 - ⏱️ 30 sekunders timeout med network idle wait strategy
@@ -117,6 +119,58 @@ Tag screenshot af en URL
 }
 ```
 
+### POST /screenshot/multiple-sizes
+Tag screenshots af samme URL i flere størrelser (optimeret - loader siden kun én gang)
+
+**Request Body:**
+```json
+{
+  "url": "https://example.com",
+  "screenSizes": ["desktop", "tablet", "mobile"],
+  "format": "png",
+  "quality": 80,
+  "fullPage": false,
+  "delay": 2000,
+  "disableAnimations": true,
+  "autoScroll": true
+}
+```
+
+**Parameters:**
+- `url` (required): URL til websitet
+- `screenSizes` (required): Array af skærmstørrelser (mindst én)
+- `format` (optional): Billedformat - "png" eller "jpeg" (default: "png")
+- `quality` (optional): JPEG kvalitet 0-100 (default: 80)
+- `fullPage` (optional): Tag screenshot af hele siden (default: false)
+- `delay` (optional): Ekstra ventetid i millisekunder (default: 2000)
+- `disableAnimations` (optional): Disable CSS animationer (default: true)
+- `autoScroll` (optional): Auto-scroll gennem siden (default: true)
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://example.com",
+    "screenshots": [
+      {
+        "screenshot": "iVBORw0KGgoAAAANSUhEUgAA...",
+        "screenSize": "desktop",
+        "dimensions": { "width": 1920, "height": 1080 },
+        "format": "png"
+      },
+      {
+        "screenshot": "iVBORw0KGgoAAAANSUhEUgAA...",
+        "screenSize": "tablet",
+        "dimensions": { "width": 768, "height": 1024 },
+        "format": "png"
+      }
+    ],
+    "timestamp": "2026-01-12T10:30:00.000Z"
+  }
+}
+```
+
 ### POST /screenshot/crawl
 Crawler et helt website og tag screenshots af alle interne sider
 
@@ -186,6 +240,7 @@ Generer ZIP fil fra allerede hentede screenshots (undgår re-crawling)
       "url": "https://example.com",
       "screenshot": "base64...",
       "format": "png",
+      "screenSize": "desktop",
       "success": true,
       "index": 1
     }
@@ -199,7 +254,12 @@ Generer ZIP fil fra allerede hentede screenshots (undgår re-crawling)
 ```
 
 **Success Response (200):**
-Returnerer en ZIP fil med alle screenshots.
+Returnerer en ZIP fil med alle screenshots. Filnavne følger formatet: `domain_path_size.extension`
+
+**Eksempel filnavne:**
+- `example_com_index_desktop.png` - Homepage i desktop størrelse
+- `example_com_about_mobile.png` - About side i mobile størrelse
+- `example_com_products_laptop.jpeg` - Products side i laptop størrelse
 
 **Error Response (400/500):**
 ```json
@@ -249,15 +309,22 @@ Serveren kører nu på `http://localhost:3000`
 
 ## Demo Interfaces
 
-To HTML demo interfaces er inkluderet:
+Tre HTML demo interfaces er inkluderet:
 
 - **[example.html](example.html)** - Single screenshot interface
   - Tag screenshots af enkelte URLs
   - Juster alle parametre
   - Preview og download
 
+- **[example-multiple.html](example-multiple.html)** - Multiple sizes interface
+  - Tag screenshots i flere størrelser samtidig
+  - Optimeret - loader siden kun én gang
+  - Visuel checkbox selector til at vælge størrelser
+  - Preview alle størrelser i grid
+
 - **[crawler.html](crawler.html)** - Website crawler interface
   - Crawler hele websites automatisk
+  - Vælg enkelt størrelse eller "Forskellige Størrelser"
   - Preview alle screenshots i grid
   - Download som ZIP eller individuelle billeder
   - Progress tracking
@@ -292,6 +359,13 @@ curl -X POST http://localhost:3000/screenshot \
 curl -X POST http://localhost:3000/screenshot \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "screenSize": "desktop", "autoScroll": true, "delay": 3000, "disableAnimations": false}'
+```
+
+### cURL eksempel (Tag screenshots i flere størrelser)
+```bash
+curl -X POST http://localhost:3000/screenshot/multiple-sizes \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "screenSizes": ["desktop", "tablet", "mobile"]}'
 ```
 
 ### cURL eksempel (Crawler website med JSON output)
@@ -451,6 +525,16 @@ Website crawleren finder automatisk alle interne links på en side og tager scre
 - 💾 Download som JSON eller ZIP
 - 🖼️ Preview i browser før download (JSON mode)
 - 📦 ZIP inkluderer metadata.json fil
+- 📐 **Multiple Sizes Mode** - Crawler først, tag derefter screenshots i alle valgte størrelser
+- 📝 **Smart filnavngivning** - domain_path_size.extension (f.eks. example_com_about_mobile.png)
+
+**Filnavngivning:**
+Alle screenshots navngives automatisk efter mønsteret: `domain_path_size.extension`
+
+Eksempler:
+- `example_com_index_desktop.png` - Homepage
+- `example_com_about-us_mobile.png` - About side
+- `example_com_products_category_laptop.jpeg` - Nested path
 
 **Begrænsninger:**
 - Max 100 sider per crawl
@@ -493,16 +577,16 @@ Hurtigst muligt screenshot af viewport uden scroll eller delay.
 ```
 Lader animationer køre i 5 sekunder og fanger dem i deres animerede tilstand.
 
-### Crawler et helt website
+### Crawler et helt website med multiple sizes
 ```json
 {
   "url": "https://example.com",
   "maxPages": 20,
-  "screenSize": "laptop",
+  "screenSizes": ["desktop", "tablet", "mobile"],
   "outputFormat": "zip"
 }
 ```
-Crawler op til 20 sider og download alle screenshots som ZIP fil.
+Crawler op til 20 sider og tag screenshots i 3 størrelser. Download alle som ZIP med smart filnavngivning (f.eks. example_com_about_desktop.png).
 
 ## Teknologi Stack
 
